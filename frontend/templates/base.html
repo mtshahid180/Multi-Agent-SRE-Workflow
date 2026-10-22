@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}AI SRE Agent{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body {% block body_attrs %}{% endblock %}>
+  <div class="wallpaper"></div>
+  <div class="window">
+    <header class="titlebar">
+      <div class="lights"><i class="l red"></i><i class="l yellow"></i><i class="l green"></i></div>
+      <div class="title">AI SRE Agent</div>
+      <div class="api-state {{ 'ok' if api_ok else 'bad' }}">{{ 'API online' if api_ok else 'API offline' }}</div>
+    </header>
+    <div class="layout">
+      <aside class="sidebar">
+        <a class="side-new" href="{{ url_for('home') }}">+ New incident</a>
+        <div class="side-title">Recent incidents</div>
+        {% for i in recent %}
+        <a class="side-item {{ 'sel' if i.id == current_id }}" href="{{ url_for('incident', incident_id=i.id) }}">
+          <span class="dot {{ tone(i.status) }}"></span>
+          <span class="si-text"><b>{{ i.title }}</b><small>{{ label(i.status) }}</small></span>
+        </a>
+        {% else %}
+        <p class="muted small pad">No incidents yet.</p>
+        {% endfor %}
+      </aside>
+      <main class="content">
+        {% for cat, msg in get_flashed_messages(with_categories=true) %}
+        <div class="flash {{ cat }}">{{ msg }}</div>
+        {% endfor %}
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+  </div>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

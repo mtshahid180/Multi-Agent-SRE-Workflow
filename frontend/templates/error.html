@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Problem - AI SRE Agent{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>Something is not reachable</h1>
+  <p class="lead">{{ message }}</p>
+  <p class="muted">Start the API in another terminal:</p>
+  <pre class="code">uvicorn app.main:create_app --factory --reload</pre>
+  <a class="btn primary" href="{{ url_for('home') }}">Try again</a>
+</div>
+{% endblock %}

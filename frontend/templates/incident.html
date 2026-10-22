@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}{{ inc.request.title }} - AI SRE Agent{% endblock %}
+{% block body_attrs %}{% if polling %}data-poll="1" data-id="{{ inc.id }}" data-updated="{{ inc.updated_at }}"{% endif %}{% endblock %}
+{% block content %}
+
+<section class="inc-head">
+  <div>
+    <h1>{{ inc.request.title }}</h1>
+    <p class="muted">{{ inc.request.repository }} &middot; id <code>{{ inc.id }}</code>
+      &middot; AI calls: {{ inc.llm_calls }} &middot; fix attempts: {{ inc.attempts }}</p>
+  </div>
+  <span class="pill {{ tone(inc.status) }}">{% if polling %}<i class="pulse"></i>{% endif %}{{ label(inc.status) }}</span>
+</section>
+
+<section class="banner {{ head.tone }}">
+  <b>{{ head.title }}</b>
+  <p>{{ head.text }}</p>
+  {% if polling %}<small>This page updates automatically.</small>{% endif %}
+</section>
+
+{% if inc.notes %}
+<section class="notes">
+  <b>Notes from the agent</b>
+  <ul>{% for n in inc.notes %}<li>{{ n }}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+
+<h2 class="section-title">Workflow</h2>
+<nav class="pipeline">
+  {% for s in steps %}
+  <a href="#step-{{ s.key }}" class="node {{ s.state }}" title="{{ s.state_label }}">
+    <span class="n">{{ s.n }}</span><span class="t">{{ s.title }}</span>
+  </a>
+  {% if not loop.last %}<span class="link {{ s.state }}"></span>{% endif %}
+  {% endfor %}
+</nav>
+
+<h2 class="section-title">What the agent is doing, step by step</h2>
+{% for s in steps %}
+<article class="step {{ s.state }}" id="step-{{ s.key }}">
+  <div class="step-badge"><span class="num">{{ s.n }}</span></div>
+  <div class="step-body">
+    <div class="step-top"><h3>{{ s.title }}</h3><span class="state {{ s.state }}">{{ s.state_label }}</span></div>
+    <p class="does"><b>What this step does:</b> {{ s.does }}</p>
+    {% if s.result %}<p class="result"><b>Result:</b> {{ s.result }}</p>{% endif %}
+    {% if s.detail %}<p class="problem">{{ s.detail }}</p>{% endif %}
+
+    {% if s.key == 'investigate' and inc.evidence and s.state == 'done' %}
+    <details><summary>Show the evidence ({{ inc.evidence|length }})</summary>
+      {% for e in inc.evidence %}
+      <div class="ev"><b>{{ e.id }}</b> <span class="tag">{{ e.kind }}</span> {{ e.ref }}
+        <pre class="code">{{ e.excerpt }}</pre></div>
+      {% endfor %}
+    </details>
+    {% endif %}
+
+    {% if s.key == 'root_cause' and inc.hypotheses and s.state == 'done' %}
+    {% for h in inc.hypotheses %}
+    <div class="hyp">
+      <div><span class="pill small {{ 'green' if h.confidence == 'high' else 'orange' if h.confidence == 'medium' else 'gray' }}">{{ h.confidence }} confidence</span>
+        {{ h.description }}</div>
+      <ul class="small muted">
+        <li>Evidence used: {{ h.supporting_evidence|join(', ') or 'none' }}</li>
+        {% for a in h.assumptions %}<li>Assumption: {{ a }}</li>{% endfor %}
+        {% for m in h.additional_evidence_needed %}<li>Still needed: {{ m }}</li>{% endfor %}
+      </ul>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    {% if s.key == 'patch' and inc.patch and s.state == 'done' %}
+    <p>{{ inc.patch.rationale }}</p>
+    <div class="diff-head"><b>Proposed change</b>
+      <button type="button" class="btn tiny" data-copy="{{ inc.patch.diff }}">Copy diff</button></div>
+    <pre class="diff">{% for cls, line in inc.patch.diff|diff_lines %}<span class="{{ cls }}">{{ line }}</span>{% endfor %}</pre>
+    {% if inc.patch.tests_to_run %}<p class="small muted">Suggested tests: {{ inc.patch.tests_to_run|join(', ') }}</p>{% endif %}
+    {% endif %}
+
+    {% if s.key == 'policy' and inc.policy and s.state in ('done', 'failed') %}
+    <p><span class="pill small {{ 'red' if inc.policy.risk == 'high' else 'orange' if inc.policy.risk == 'medium' else 'green' }}">risk: {{ inc.policy.risk }}</span></p>
+    <ul class="small">{% for r in inc.policy.reasons %}<li>{{ r }}</li>{% endfor %}</ul>
+    {% endif %}
+
+    {% if s.key == 'approval' and s.state == 'waiting' %}
+    <div class="approve-box">
+      <p><b>Before you approve:</b> read the change in step 4. Approval is tied to this exact patch
+      (<code>{{ inc.patch.sha256[:12] }}</code>); if it changes, you must approve again.</p>
+      <form method="post" action="{{ url_for('approve', incident_id=inc.id) }}" class="form">
+        <input type="hidden" name="patch_sha256" value="{{ inc.patch.sha256 }}">
+        <label>Your name <input name="approver" required></label>
+        <label>Comment <span class="muted">(optional)</span> <input name="comment"></label>
+        <div class="row">
+          <button class="btn primary" type="submit">Approve</button>
+          <button class="btn danger" type="submit" formaction="{{ url_for('reject', incident_id=inc.id) }}">Reject</button>
+        </div>
+      </form>
+    </div>
+    {% endif %}
+
+    {% if s.key == 'ci' and inc.verifications %}
+    {% for v in inc.verifications %}
+    <div class="ci {{ 'ok' if v.passed else 'bad' }}">
+      <b>Attempt {{ v.attempt }}: {{ v.conclusion }}</b>
+      {% if v.run_url %}<a href="{{ v.run_url }}" target="_blank" rel="noopener">open run</a>{% endif %}
+      {% if v.failed_jobs %}<div class="small">Failed: {{ v.failed_jobs|join(', ') }}</div>{% endif %}
+      {% if v.log_excerpt %}<details><summary>Show log</summary><pre class="code">{{ v.log_excerpt }}</pre></details>{% endif %}
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    {% if s.key == 'pr' and inc.pull_request_url %}
+    <a class="btn primary" href="{{ inc.pull_request_url }}" target="_blank" rel="noopener">Open the Pull Request</a>
+    {% endif %}
+  </div>
+</article>
+{% endfor %}
+
+<section class="card">
+  <h2>Audit trail</h2>
+  <p class="muted small">Every action is recorded: who did what, and when.</p>
+  <ul class="timeline">
+    {% for e in events %}
+    <li><time data-ts="{{ e.ts }}">{{ e.ts|fmt_iso }}</time>
+      <b>{{ event_label.get(e.type, e.type.replace('status:', 'Status: ')) }}</b>
+      <small>by {{ e.actor }}</small></li>
+    {% endfor %}
+  </ul>
+</section>
+{% endblock %}

@@ -1,0 +1,7 @@
+{
+  "title": "Report job crashes with ZeroDivisionError for new customers",
+  "description": "Customers with no orders yet make the nightly report job fail.",
+  "repository": "local:sample_app",
+  "logs": "2026-10-20 02:00:01 ERROR report job failed\nTraceback (most recent call last):\n  File \"/app/report.py\", line 18, in build_report\n    avg = average(order_totals)\n  File \"/app/calculator/stats.py\", line 6, in average\n    return total / len(values)\nZeroDivisionError: division by zero\n",
+  "test_output": "FAILED tests/test_stats.py::test_average_of_empty_list_is_zero - ZeroDivisionError"
+}

@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <h1>Fix production incidents with an AI assistant you stay in control of</h1>
+  <p class="lead">Give it an error. It investigates, explains the cause, proposes a fix and,
+  <b>only after you approve</b>, tests it on GitHub and opens a draft Pull Request.</p>
+</section>
+
+<section class="card">
+  <h2>How it works</h2>
+  <p class="muted">Every incident goes through these 9 steps. You will see each one live.</p>
+  <ol class="mini-flow">
+    {% for key, title, does in steps %}
+    <li class="{{ 'human' if key == 'approval' }}"><span class="num">{{ loop.index }}</span>
+      <div><b>{{ title }}</b><small>{{ does }}</small></div></li>
+    {% endfor %}
+  </ol>
+  <p class="small muted">Step 6 is the only point where a human decides. The agent never pushes
+  to your main branch.</p>
+</section>
+
+<section class="card">
+  <h2>Submit an incident</h2>
+  <div class="segmented" role="tablist">
+    <button type="button" class="seg active" data-tab="sample">Quick sample</button>
+    <button type="button" class="seg" data-tab="custom">Custom incident</button>
+  </div>
+
+  <div class="tab" id="tab-sample">
+    <p>A ready-made bug: <code>average([])</code> crashes with <code>ZeroDivisionError</code>.
+    It runs on the built-in local sample, so no GitHub is needed.</p>
+    <form method="post" action="{{ url_for('submit_sample') }}">
+      <button class="btn primary" type="submit">Run sample incident</button>
+    </form>
+  </div>
+
+  <div class="tab hidden" id="tab-custom">
+    <form method="post" action="{{ url_for('submit_custom') }}" class="form">
+      <label>Title
+        <input name="title" id="f-title" placeholder="Report job crashes with ZeroDivisionError" required>
+      </label>
+      <label>Repository
+        <input name="repository" id="f-repo" value="local:sample_app" required>
+        <small>GitHub: <code>username/repo</code> &nbsp;|&nbsp; Built-in sample: <code>local:sample_app</code>.
+        It must be listed in <code>ALLOWED_REPOS</code>.</small>
+      </label>
+      <label>Base branch <span class="muted">(optional, default branch if empty)</span>
+        <input name="base_branch" placeholder="main">
+      </label>
+      <label>Description <span class="muted">(optional)</span>
+        <textarea name="description" rows="2"></textarea>
+      </label>
+      <label>Error log / stack trace
+        <textarea name="logs" id="f-logs" rows="7" placeholder="Paste the traceback here"></textarea>
+      </label>
+      <label>Failing test output <span class="muted">(optional)</span>
+        <textarea name="test_output" id="f-tests" rows="2"></textarea>
+      </label>
+      <div class="row">
+        <button class="btn primary" type="submit">Submit incident</button>
+        <button class="btn" type="button" id="fill-sample">Fill with the sample bug</button>
+      </div>
+    </form>
+  </div>
+</section>
+{% endblock %}
