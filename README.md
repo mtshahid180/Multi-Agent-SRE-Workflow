@@ -51,128 +51,19 @@ Request** — with a mandatory **human approval gate** before anything is ever d
 
 ### 🔁 Incident Lifecycle (State Machine)
 
-```mermaid
-stateDiagram-v2
-    [*] --> RECEIVED: POST /incidents
-    RECEIVED --> INVESTIGATING: agent starts
-    INVESTIGATING --> ANALYZED: no patch possible
-    INVESTIGATING --> AWAITING_APPROVAL: patch proposed
-    AWAITING_APPROVAL --> APPROVED: POST /approve ✅
-    AWAITING_APPROVAL --> REJECTED: POST /reject ❌
-    AWAITING_APPROVAL --> DENIED: policy block 🚫
-    APPROVED --> DELIVERING: push repair branch
-    DELIVERING --> VERIFYING: CI triggered
-    VERIFYING --> PR_CREATED: checks pass ✅
-    VERIFYING --> INVESTIGATING: retry < MAX_FIX_ATTEMPTS
-    VERIFYING --> FAILED: retries exhausted
-    PR_CREATED --> [*]: human merges
-    FAILED --> [*]
-    REJECTED --> [*]
-    DENIED --> [*]
-```
+<img width="886" height="1226" alt="mermaid-diagram" src="https://github.com/user-attachments/assets/34621e68-8c9c-42b4-9e3d-6f4857f28807" />
 
 ### 🔀 Agent Orchestration Graph (LangGraph)
 
-```mermaid
-flowchart TD
-    START([🎯 Incident Received]) --> ENTRY{Entry Router}
-    ENTRY -->|status: received| INV
-    ENTRY -->|status: approved| APPLY
-    ENTRY -->|other| END1([⏹ END])
-
-    subgraph PHASE1 [" Phase 1 — Analysis"]
-        INV["🔎 investigate<br/><i>collect logs, files, commits, tests</i>"]
-        RC["🧠 root_cause<br/><i>hypotheses with evidence</i>"]
-        GEN["✏️ generate_patch<br/><i>minimal diff via LLM</i>"]
-    end
-
-    subgraph PHASE2 ["🛡 Phase 2 — Safety"]
-        GATE{"policy_gate"}
-    end
-
-    subgraph PHASE3 [" Phase 3 — Delivery & Verification"]
-        APPLY["📤 apply_patch<br/><i>push repair branch</i>"]
-        VERIFY{"🧪 verify<br/><i>GitHub Actions CI</i>"}
-        PR[" Pull Request<br/><i>draft + evidence</i>"]
-    end
-
-    INV -->|ok| RC --> GEN
-    GEN -->|patch| GATE
-    GEN -->|no_patch| END2([⏹ END — analyzed])
-
-    GATE -->|auto-approved| APPLY
-    GATE -->|await_approval| END3([⏸ PAUSED — human gate])
-    GATE -->|denied| END4([🚫 END — denied])
-
-    APPLY -->|pushed| VERIFY
-    VERIFY -->|passed ✅| PR --> END5([✅ END — PR created])
-    VERIFY -->|retry 🔄| GEN
-    VERIFY -->|failed ❌| END6([❌ END — failed])
-```
+<img width="2648" height="666" alt="mermaid-diagram (1)" src="https://github.com/user-attachments/assets/a11c22f5-52c8-4910-8e34-80e02442032e" />
 
 ### 🌐 End-to-End Sequence
 
-```mermaid
-sequenceDiagram
-    actor Dev as 👨‍💻 Developer
-    participant API as 🌐 FastAPI API
-    participant AG as 🤖 LangGraph Agent
-    participant LLM as 🧠 LLM API
-    participant GH as 🐙 GitHub
-    participant RUN as ⚡ Actions Runner
-
-    Dev->>API: POST /incidents (logs + repo)
-    API->>AG: background task: run(graph)
-    AG->>GH: fetch evidence (files, commits, tests)
-    AG->>LLM: analyze → root cause + patch
-    LLM-->>AG: hypotheses + diff
-    AG->>API: status = awaiting_approval
-    API-->>Dev: PATCH proposal (GET /patch)
-
-    Dev->>API: POST /approve (sha256 ✅)
-    API->>AG: resume → apply_patch
-    AG->>GH: push repair branch
-    AG->>RUN: trigger verify-patch.yml
-    RUN->>RUN: ruff + pytest (remote!)
-    RUN-->>AG: conclusion: success
-    AG->>GH: open draft PR + evidence
-    GH-->>Dev: 🔗 Pull Request URL
-```
-
----
+<img width="2234" height="1422" alt="mermaid-diagram (2)" src="https://github.com/user-attachments/assets/4d70f86f-bd1d-46f7-bf8b-c1fbc7da3854" />
 
 ## 🏗️ Architecture
 
-```mermaid
-flowchart LR
-    subgraph CLIENTS ["Clients"]
-        UI["🖥️ Web UI<br/>Flask :5050"]
-        CLI["⚡ curl / API client"]
-        WH["🔔 GitHub Webhooks"]
-    end
-
-    subgraph CORE ["Core"]
-        API["⚡ FastAPI Backend<br/>auth · validation · redaction"]
-        GRAPH["🤖 LangGraph Orchestrator"]
-        POLICY["🛡️ Policy & Approval Gate"]
-        STORE[("💾 SQLite<br/>incidents.db")]
-    end
-
-    subgraph EXT ["External Services"]
-        LLM["🧠 LLM API<br/>Anthropic / OpenAI"]
-        GH["🐙 GitHub<br/>branches · PRs"]
-        CI["⚡ GitHub Actions<br/>ruff + pytest"]
-    end
-
-    UI & CLI & WH --> API
-    API --> GRAPH
-    GRAPH --> STORE
-    GRAPH <--> LLM
-    GRAPH --> POLICY
-    POLICY -- "approved" --> GH
-    GH -- "workflow_dispatch" --> CI
-    CI -- "results" --> GRAPH
-```
+<img width="2316" height="712" alt="mermaid-diagram (3)" src="https://github.com/user-attachments/assets/c55cdc1a-3bd1-48ee-97c5-e2a6df652387" />
 
 ### 📂 Repository Structure
 
